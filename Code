@@ -1,0 +1,47 @@
+#include <MIDI.h>                      //Δηλώνουμε οτι χρησιμοποιούμε τη βιβλιοθήκη έτοιμου κώδικα MIDI
+MIDI_CREATE_DEFAULT_INSTANCE();        //Εντολή για τη συμβατότητα των MIDI εντολών : sendNoteOn και sendNoteOff με τη βιβλιοθήκη έτοιμου κώδικα MIDI
+const int MidiChannel = 1;             //Δηλώνουμε τη μεταβλητή MidiChannel για το κανάλι Midi που θα στέλνουμε τα Midi δεδομένα
+const int Piezos = 15;                 //Με τη μεταβλητή Piezos δηλώνουμε πόσους Piezo αισθητήρες χρησιμοποιούμε
+const int PiezoPin[Piezos] = {A0, A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14};       //Με τη μεταβλητή PiezoPin αντιστιχοίζουμε τους Piezo αισθητήρες στις αναλογικές εισόδους του Arduino που τους έχουμε συνδέσει
+const int MidiNote[Piezos] = {86, 84, 83, 81, 79, 77, 76, 74, 72, 71, 69, 67, 65, 64, 62};            //Με τη μεταβλητή MidiNote δηλώνουμε τη νότα που θα παίζει ο αιθητήρας της αντίστοιχης αναλογικής εισόδου του Arduino
+int PiezoValue[Piezos] = {0};          //Δηλώνουμε τη μεταβλητή PiezoValue για την τιμή που θα διαβάζουμε απο τον αισθητήρα
+int MidiValue[Piezos] = {0};           //Δηλώνουμε τη μεταβλητή MidiValue για την τιμή που διαβάζουμε απο τον αισθητήρα και τη μετατρέπουμε σε τιμή Midi
+const int Sensitivity = 5;             //Δηλώνουμε τη μεταβλητή Sensitivity για την ευαισθησία των αισθητήρων στο πάτημα
+const int ValueScale = 20;              //Δηλώνουμε τη μεταβλητή ValueScale για την κλίμακα των τιμών
+bool PiezoOn[Piezos] = {false};        //Δηλώνουμε τη μεταβλητή PiezoOn για το αν έχουμε πατήσει τον αισθητήρα
+const int MidiDuration = 30;           //Δηλώνουμε τη μεταβλητή MidiDuration για το χρόνο που διαρκεί η Midi νότα
+int DurationCount[Piezos] = {0};       //Δηλώνουμε τη μεταβλητή DurationCount για το χρόνο που θα διαρκεί η νότα απο τη στιγμή που πατήθηκε ο αιθητήρας μέχρι να σταματήσει
+
+void setup () {
+  Serial.begin (115200);
+  delay (1000);
+}
+
+void loop () {
+  {
+    for (int count; count < Piezos; count++)                              //Για καθένα απο τους αισθητήρες Piezo
+    {
+      PiezoValue[count] = analogRead(PiezoPin[count]);                    //Διαβάζουμε την τιμή του αισθητήρα απο την αντίστοιχη αναλογική είσοδο του Arduino
+      if (PiezoValue[count] > ValueScale && PiezoOn[count] == false)      //Ελέγχουμε αν έχει πατηθεί ο αισθητήρας και αν η τιμή του είναι πάνω απο την κατώτερη τιμή
+      {
+        MidiValue[count] = PiezoValue[count] * (127.0 / 1023.0);          //Μετατρέπουμε την τιμή του αισθητήρα σε τιμή Midi
+        MidiValue[count] *= Sensitivity;                                  //Υπολογίζουμε την τιμή βάσει της ευαισθησίας που έχουμε ορίσει
+        if (MidiValue[count] > 127)                                       //Σε περίπτωση που η τιμή Midi είναι μεγαλύτερη απο την μέγιστη
+          MidiValue[count] = 127;                                         //της δίνουμε τη μέγιστη τιμή
+        MIDI.sendNoteOn (MidiNote[count], MidiValue[count], MidiChannel); //Στέλνουμε το Midi μύνημα NoteOn με την τιμή της νότας που παίζει,την τιμή Midi και το Midi κανάλι που στέλνουμε τα δεδομένα
+        PiezoOn[count] = true;                                            //Δηλώνουμε οτι ο αισθητήρας πατήθηκε
+        DurationCount[count] = MidiDuration;                              //Μετράμε τη διάρκεια της νότας μέχρι να σταματήσει
+      }
+      if (PiezoOn[count] == true)                                         //Αν ο αιθητήρας έχει πατηθεί
+      {
+        DurationCount[count]--;                                           //Μειώνουμε το χρόνο μέχρι το τέλος της διάκειας της νότας
+        if (DurationCount[count] == 0)                                    //Όταν ο χρόνος είναι 0
+        {
+          MIDI.sendNoteOff (MidiNote[count], 0, MidiChannel);             //Στέλνουμε το Midi μύνημα NoteOff με την τιμή της νότας που παίζει,την τιμή Midi = 0 και το Midi κανάλι που στέλνουμε τα δεδομένα για να σταματήσει η νότα
+          PiezoOn[count] = false;                                         //Δηλώνουμε οτι σταμάτησε η νότα
+        }
+      }
+    }
+    delay(1);
+  }
+}
